@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
@@ -20,6 +21,7 @@ var (
 	version   bool
 	help      bool
 	depth     int
+	rootPath  string
 )
 
 type nodeInfo struct {
@@ -29,10 +31,11 @@ type nodeInfo struct {
 }
 
 func init() {
-	flag.StringSliceVar(&zkServers, "zk", []string{"127.0.0.1"}, "zk address")
+	flag.StringSliceVar(&zkServers, "zk", []string{"127.0.0.1:2181"}, "zk address")
 	flag.BoolVar(&version, "version", false, "print version info")
 	flag.BoolVar(&help, "help", false, "print help and exit")
 	flag.IntVar(&depth, "depth", 0, "list depth of directory deep, default is 0 for recursively to the leaf.")
+	flag.StringVar(&rootPath, "root-path", "/", "the root path list from, the path should be start with '/'")
 
 }
 
@@ -56,7 +59,10 @@ func main() {
 		panic(err)
 	}
 
-	nis, err := getChildren(c, "/", 0, depth)
+	if strings.Index(rootPath, "/") != 0 {
+		panic("root path is not start with '/' ")
+	}
+	nis, err := getChildren(c, rootPath, 0, depth)
 	if err != nil {
 		fmt.Printf("err:%s\n", err.Error())
 	}
