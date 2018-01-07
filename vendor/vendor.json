@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "y33yd1uDZmV3VY4K/5FCGTeRtB8=",
+			"path": "github.com/samuel/go-zookeeper/zk",
+			"revision": "471cd4e61d7a78ece1791fa5faa0345dc8c7d5a5",
+			"revisionTime": "2017-11-17T18:40:27Z"
+		}
+	],
+	"rootPath": "gitlab.ucloudadmin.com/xiaohui/zktree"
+}
