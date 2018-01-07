@@ -2,10 +2,24 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
+	flag "github.com/spf13/pflag"
+)
+
+const (
+	//VERSION info
+	VERSION = "v0.1.0"
+)
+
+var (
+	zkServers []string
+	version   bool
+	help      bool
+	depth     int
 )
 
 type nodeInfo struct {
@@ -14,13 +28,35 @@ type nodeInfo struct {
 	level int
 }
 
+func init() {
+	flag.StringSliceVar(&zkServers, "zk", []string{"127.0.0.1"}, "zk address")
+	flag.BoolVar(&version, "version", false, "print version info")
+	flag.BoolVar(&help, "help", false, "print help and exit")
+	flag.IntVar(&depth, "depth", 0, "list depth of directory deep, default is 0 for recursively to the leaf.")
+
+}
+
+func printVersion() {
+	fmt.Printf("zktree: is a tool list zookeeper node contents of directories in a tree-like format， version: %s", VERSION)
+}
+
 func main() {
-	c, _, err := zk.Connect([]string{"127.0.0.1"}, time.Second*10, zk.WithLogInfo(false))
+	flag.Parse()
+	if version {
+		printVersion()
+		os.Exit(1)
+	}
+	if help {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	c, _, err := zk.Connect(zkServers, time.Second*10, zk.WithLogInfo(false))
 	if err != nil {
 		panic(err)
 	}
 
-	nis, err := getChildren(c, "/", 0, 4)
+	nis, err := getChildren(c, "/", 0, depth)
 	if err != nil {
 		fmt.Printf("err:%s\n", err.Error())
 	}
@@ -51,7 +87,7 @@ func getChildren(c *zk.Conn, path string, level, depth int) ([]*nodeInfo, error)
 	nodes = append(nodes, &node)
 
 	level++
-	if level > depth {
+	if depth != 0 && level > depth {
 		return nodes, nil
 	}
 	if stat.NumChildren != 0 {

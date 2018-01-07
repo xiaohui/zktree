@@ -7,6 +7,12 @@
 			"path": "github.com/samuel/go-zookeeper/zk",
 			"revision": "471cd4e61d7a78ece1791fa5faa0345dc8c7d5a5",
 			"revisionTime": "2017-11-17T18:40:27Z"
+		},
+		{
+			"checksumSHA1": "WZHF26m8UJ3WU5//TIDeUC3xs4o=",
+			"path": "github.com/spf13/pflag",
+			"revision": "d16db1e50e33dff1b6cdf37596cef36742128670",
+			"revisionTime": "2017-03-27T14:13:44Z"
 		}
 	],
 	"rootPath": "gitlab.ucloudadmin.com/xiaohui/zktree"
