@@ -31,6 +31,8 @@ var (
 	datalen     bool // output datalen of znode
 	childrennum bool // output children num of znode
 	ephemeral   bool // output ephemeral ower of znode
+	tree        bool // output in tree-like format
+	full        bool //output the pull path
 
 	version bool
 	help    bool
@@ -54,6 +56,8 @@ func init() {
 	flag.BoolVar(&datalen, "datalen", false, "output datalen of znode")
 	flag.BoolVar(&childrennum, "childrennum", false, "output children num of znode")
 	flag.BoolVar(&ephemeral, "ephemeral", false, "output ephemeral ower of znode")
+	flag.BoolVar(&tree, "tree", false, "output in tree-like format")
+	flag.BoolVar(&full, "full", false, "output the pull path")
 
 	flag.StringVar(&rootPath, "root-path", "/", "the root path list from, the path should be start with '/'")
 	flag.StringSliceVar(&zkServers, "zk", []string{"127.0.0.1:2181"}, "zk address")
@@ -148,7 +152,7 @@ func printNodeInfo(nis []*nodeInfo) {
 		return strings.Compare(a, b) == -1
 	})
 
-	for _, ni := range nis {
+	for i, ni := range nis {
 		var s string
 		if zstat || zxid {
 			s += fmt.Sprintf("%#11x%#13x%#13x", ni.stat.Czxid, ni.stat.Mzxid, ni.stat.Pzxid)
@@ -173,12 +177,84 @@ func printNodeInfo(nis []*nodeInfo) {
 		if zstat || zxid || zversion || ztime || ephemeral || datalen || childrennum {
 			s = "[" + s + "] "
 		}
-
-		if data {
-			s += fmt.Sprintf("%s\t%+v\n", ni.path, string(ni.data))
-		} else {
-			s += fmt.Sprintf("%s\n", ni.path)
+		if tree {
+			s = indent(i, nis) + s
 		}
-		fmt.Printf(s)
+		if !full {
+			s += filepath.Base(ni.path)
+		} else {
+			s += ni.path
+		}
+		if data {
+			if len(ni.data) == 0 {
+				s += ""
+			} else {
+				s += fmt.Sprintf("\t[%s]", string(ni.data))
+			}
+		}
+		fmt.Printf("%s\n", s)
 	}
+}
+
+func indent(index int, nis []*nodeInfo) string {
+	if len(nis) == 0 {
+		return ""
+	}
+
+	path := nis[index].path
+	if path == "/" {
+		return ""
+	}
+
+	p := strings.Split(path, "/")
+	if len(p) <= 1 {
+		return ""
+	}
+
+	var prefix string
+	for i := 1; i < len(p); i++ {
+		tmp := strings.Join(p[:i+1], "/")
+		found, last := hasSibling(tmp, nis)
+		//	fmt.Printf("p: %v, %s,%v,%v\n", p, tmp, found, last)
+		if i == len(p)-1 {
+			if last {
+				prefix += fmt.Sprint("└── ")
+			} else {
+				prefix += fmt.Sprint("├── ")
+			}
+			return prefix
+		}
+		if found && !last {
+			prefix += "│   "
+		} else {
+			prefix += "    "
+		}
+	}
+
+	return prefix
+}
+
+// first, return true, if silbing found.
+// second, return true if path is the last node in the same level.
+func hasSibling(path string, nis []*nodeInfo) (bool, bool) {
+	if len(path) == 0 || len(nis) == 0 {
+		return false, false
+	}
+
+	dir := filepath.Dir(path)
+	var found bool
+	var sindex, myindex int
+	for i, ni := range nis {
+		pdir := filepath.Dir(ni.path)
+		if ni.path != path && pdir == dir {
+			found = true
+			sindex = i
+		}
+
+		if ni.path == path {
+			myindex = i
+		}
+	}
+
+	return found, sindex < myindex
 }
