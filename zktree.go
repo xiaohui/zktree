@@ -26,8 +26,9 @@ var (
 
 type nodeInfo struct {
 	path  string
-	value string
+	value []byte
 	level int
+	stat  zk.Stat
 }
 
 func init() {
@@ -40,7 +41,7 @@ func init() {
 }
 
 func printVersion() {
-	fmt.Printf("zktree: is a tool list zookeeper node contents of directories in a tree-like format， version: %s", VERSION)
+	fmt.Printf("zktree: is a tool list zookeeper node contents of directories in a tree-like format， version: %s\n", VERSION)
 }
 
 func main() {
@@ -62,34 +63,31 @@ func main() {
 	if strings.Index(rootPath, "/") != 0 {
 		panic("root path is not start with '/' ")
 	}
-	nis, err := getChildren(c, rootPath, 0, depth)
+	nis, err := zkWalker(c, rootPath, 0, depth)
 	if err != nil {
 		fmt.Printf("err:%s\n", err.Error())
 	}
 	printNodeInfo(nis)
 }
 
-func getChildren(c *zk.Conn, path string, level, depth int) ([]*nodeInfo, error) {
+func zkWalker(c *zk.Conn, path string, level, depth int) ([]*nodeInfo, error) {
 	if c == nil {
 		return nil, nil
 	}
 
 	p := filepath.Clean(path)
-	children, stat, err := c.Children(p)
+	v, stat, err := c.Get(p)
 	if err != nil {
-		return nil, fmt.Errorf("get zk children node failed, path:%s err: %s\n", p, err.Error())
+		return nil, fmt.Errorf("get zk value node failed %s", err.Error())
 	}
 
 	var nodes []*nodeInfo
-	v, _, err := c.Get(path)
-	if err != nil {
-		return nil, fmt.Errorf("get zk children node failed %s", err.Error())
+	node := nodeInfo{
+		path:  p,
+		level: level,
+		value: v,
+		stat:  *stat,
 	}
-
-	var node nodeInfo
-	node.path = path
-	node.level = level
-	node.value = string(v)
 	nodes = append(nodes, &node)
 
 	level++
@@ -97,12 +95,16 @@ func getChildren(c *zk.Conn, path string, level, depth int) ([]*nodeInfo, error)
 		return nodes, nil
 	}
 	if stat.NumChildren != 0 {
+		children, _, err := c.Children(p)
+		if err != nil {
+			return nil, fmt.Errorf("get children node failed, path:%s err: %s", p, err.Error())
+		}
 		var nis []*nodeInfo
 		for _, child := range children {
 			path := filepath.Clean(path + "/" + child)
-			nis, err = getChildren(c, path, level, depth)
+			nis, err = zkWalker(c, path, level, depth)
 			if err != nil {
-				fmt.Printf("failed to get children info of node: %s, err: %s\n", path, err.Error())
+				fmt.Printf("zk walker failed: %s, err: %s", path, err.Error())
 				continue
 			}
 			nodes = append(nodes, nis...)
@@ -114,11 +116,11 @@ func getChildren(c *zk.Conn, path string, level, depth int) ([]*nodeInfo, error)
 
 func printNodeInfo(nis []*nodeInfo) {
 	if nis == nil || len(nis) == 0 {
-		fmt.Printf("no children node found")
+		fmt.Println("no children node found")
 		return
 	}
 
 	for _, ni := range nis {
-		fmt.Printf("level:%d\t%s\t\t%s\n", ni.level, ni.path, ni.value)
+		fmt.Printf("level:%d\t%s\t\t%+v\n", ni.level, ni.path, string(ni.value))
 	}
 }
