@@ -19,9 +19,18 @@ const (
 
 var (
 	depth     int
-	data      bool
 	rootPath  string
 	zkServers []string
+
+	//output control
+	data        bool // output the data of znode
+	zstat       bool // output the all znode stat info
+	zxid        bool // output zxid of znode, include Czxid, Mzxid and Pzxid
+	zversion    bool // output node version info,include Aversion, Cversion, Version
+	ztime       bool // output time of znode, include Ctime and Mtime
+	datalen     bool // output datalen of znode
+	childrennum bool // output children num of znode
+	ephemeral   bool // output ephemeral ower of znode
 
 	version bool
 	help    bool
@@ -38,6 +47,14 @@ func init() {
 
 	flag.IntVar(&depth, "depth", 0, "list depth of directory deep, default is 0 for recursively to the leaf.")
 	flag.BoolVar(&data, "data", false, "output the data of znode")
+	flag.BoolVar(&zstat, "zstat", false, "output the znode stat")
+	flag.BoolVar(&zxid, "zxid", false, "output zxid of znode, include Czxid, Mzxid and Pzxid")
+	flag.BoolVar(&zversion, "zversion", false, "output node version info,include Aversion, Cversion, Version")
+	flag.BoolVar(&ztime, "ztime", false, "output time of znode, include Ctime and Mtime")
+	flag.BoolVar(&datalen, "datalen", false, "output datalen of znode")
+	flag.BoolVar(&childrennum, "childrennum", false, "output children num of znode")
+	flag.BoolVar(&ephemeral, "ephemeral", false, "output ephemeral ower of znode")
+
 	flag.StringVar(&rootPath, "root-path", "/", "the root path list from, the path should be start with '/'")
 	flag.StringSliceVar(&zkServers, "zk", []string{"127.0.0.1:2181"}, "zk address")
 	flag.BoolVar(&help, "help", false, "print help and exit")
@@ -132,10 +149,36 @@ func printNodeInfo(nis []*nodeInfo) {
 	})
 
 	for _, ni := range nis {
-		if data {
-			fmt.Printf("level:%d\t%s\t\t%+v\n", ni.level, ni.path, string(ni.data))
-		} else {
-			fmt.Printf("level:%d\t%s\n", ni.level, ni.path)
+		var s string
+		if zstat || zxid {
+			s += fmt.Sprintf("%#11x%#13x%#13x", ni.stat.Czxid, ni.stat.Mzxid, ni.stat.Pzxid)
 		}
+		if zstat || zversion {
+			s += fmt.Sprintf("%4d%4d%4d", ni.stat.Aversion, ni.stat.Cversion, ni.stat.Version)
+		}
+		if zstat || ztime {
+			ctime := time.Unix(ni.stat.Ctime/1000, 0)
+			mtime := time.Unix(ni.stat.Mtime/1000, 0)
+			s += fmt.Sprintf("%31s%31s", ctime.String(), mtime.String())
+		}
+		if zstat || ephemeral {
+			s += fmt.Sprintf("%#13x", ni.stat.EphemeralOwner)
+		}
+		if zstat || datalen {
+			s += fmt.Sprintf("%5d", ni.stat.DataLength)
+		}
+		if zstat || childrennum {
+			s += fmt.Sprintf("%5d", ni.stat.NumChildren)
+		}
+		if zstat || zxid || zversion || ztime || ephemeral || datalen || childrennum {
+			s = "[" + s + "] "
+		}
+
+		if data {
+			s += fmt.Sprintf("%s\t%+v\n", ni.path, string(ni.data))
+		} else {
+			s += fmt.Sprintf("%s\n", ni.path)
+		}
+		fmt.Printf(s)
 	}
 }
