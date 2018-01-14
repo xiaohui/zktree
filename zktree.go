@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,26 +18,30 @@ const (
 )
 
 var (
-	zkServers []string
-	version   bool
-	help      bool
 	depth     int
+	data      bool
 	rootPath  string
+	zkServers []string
+
+	version bool
+	help    bool
 )
 
 type nodeInfo struct {
 	path  string
-	value []byte
 	level int
 	stat  zk.Stat
+	data  []byte //data of znode
 }
 
 func init() {
-	flag.StringSliceVar(&zkServers, "zk", []string{"127.0.0.1:2181"}, "zk address")
-	flag.BoolVar(&version, "version", false, "print version info")
-	flag.BoolVar(&help, "help", false, "print help and exit")
+
 	flag.IntVar(&depth, "depth", 0, "list depth of directory deep, default is 0 for recursively to the leaf.")
+	flag.BoolVar(&data, "data", false, "output the data of znode")
 	flag.StringVar(&rootPath, "root-path", "/", "the root path list from, the path should be start with '/'")
+	flag.StringSliceVar(&zkServers, "zk", []string{"127.0.0.1:2181"}, "zk address")
+	flag.BoolVar(&help, "help", false, "print help and exit")
+	flag.BoolVar(&version, "version", false, "print version info")
 
 }
 
@@ -76,7 +81,7 @@ func zkWalker(c *zk.Conn, path string, level, depth int) ([]*nodeInfo, error) {
 	}
 
 	p := filepath.Clean(path)
-	v, stat, err := c.Get(p)
+	d, stat, err := c.Get(p)
 	if err != nil {
 		return nil, fmt.Errorf("get zk value node failed %s", err.Error())
 	}
@@ -85,7 +90,7 @@ func zkWalker(c *zk.Conn, path string, level, depth int) ([]*nodeInfo, error) {
 	node := nodeInfo{
 		path:  p,
 		level: level,
-		value: v,
+		data:  d,
 		stat:  *stat,
 	}
 	nodes = append(nodes, &node)
@@ -120,7 +125,17 @@ func printNodeInfo(nis []*nodeInfo) {
 		return
 	}
 
+	sort.Slice(nis, func(i, j int) bool {
+		a := nis[i].path
+		b := nis[j].path
+		return strings.Compare(a, b) == -1
+	})
+
 	for _, ni := range nis {
-		fmt.Printf("level:%d\t%s\t\t%+v\n", ni.level, ni.path, string(ni.value))
+		if data {
+			fmt.Printf("level:%d\t%s\t\t%+v\n", ni.level, ni.path, string(ni.data))
+		} else {
+			fmt.Printf("level:%d\t%s\n", ni.level, ni.path)
+		}
 	}
 }
